@@ -5,29 +5,24 @@ import "../styles/Matching.scss";
 
 export default function Matching() {
   const navigate = useNavigate();
-  const [profiles, setProfiles] = useState([]); // Cambiamos a array para múltiples perfiles
+  const [profiles, setProfiles] = useState([]);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [currentUserId, setCurrentUserId] = useState(null);
 
   useEffect(() => {
-    getProfiles(); // Cambiamos a plural
-    const getCurrentUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) setCurrentUserId(user.id);
-    };
-    getCurrentUser();
+    getProfiles();
   }, []);
 
   const handleProfileClick = (userId) => {
-    navigate(`/profile/${userId}`); // Añadimos el ID al path
+    navigate(`/profile/${userId}`);
   };
 
   async function getProfiles() {
     setErrorMessage(null);
     try {
-      const { data, error } = await supabase.from("profiles").select("*");
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("id");
 
       if (error) {
         throw error;
@@ -35,7 +30,7 @@ export default function Matching() {
 
       if (data && data.length > 0) {
         console.log("profiles", data);
-        setProfiles(data); // Guardamos todos los perfiles
+        setProfiles(data);
       } else {
         setProfiles([]);
       }
@@ -46,14 +41,9 @@ export default function Matching() {
   }
 
   async function handleLike(likedUserId) {
-    if (!currentUserId) {
-      setErrorMessage("Debes estar autenticado para dar like");
-      return;
-    }
-
     try {
       const { data, error } = await supabase.from("likes").insert({
-        user_id: currentUserId,
+        user_id: likedUserId,
         liked_user_id: likedUserId,
         like_time: new Date().toISOString(),
       });
@@ -73,7 +63,7 @@ export default function Matching() {
     <div className="main">
       <h1>Matching</h1>
       {errorMessage && <p className="error">{errorMessage}</p>}
-      {profiles.length > 0 ? (
+      {profiles?.length > 0 ? (
         <div className="profiles-container">
           {profiles.map((profile) => (
             <div
@@ -82,17 +72,15 @@ export default function Matching() {
               onClick={() => handleProfileClick(profile.id)}
               style={{ cursor: "pointer" }}
             >
-              <img
-                src={
-                  profile.photo ||
-                  "https://images.unsplash.com/photo-1495360010541-f48722b34f7d?q=80&w=1936&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-                }
-                alt="Perfil"
-                className="img"
-              />
+              <img src={profile.photo || ""} alt="Perfil" className="img" />
               <h2>{profile.name || "Nombre"}</h2>
               <p>
                 {profile.age ? `${profile.age} años` : "Edad no especificada"}
+              </p>
+              <p>
+                {profile.description
+                  ? `${profile.description}`
+                  : "No hay descripcion"}
               </p>
               <div className="buttons">
                 <button
@@ -104,7 +92,7 @@ export default function Matching() {
                 >
                   Me gusta
                 </button>
-                <button className="button">No me gusta</button>
+                {/* <button className="button">No me gusta</button> */}
               </div>
             </div>
           ))}
