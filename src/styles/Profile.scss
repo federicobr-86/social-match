@@ -46,17 +46,34 @@
 }
 
 .img {
-  width: 150px; /* Reducido de 300px */
-  height: 150px; /* Reducido de 600px */
-  border-radius: 50%; /* Para una imagen circular */
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
   object-fit: cover;
   margin-bottom: 20px;
+}
+
+.edit-form {
+  text-align: left;
+}
+
+.field {
+  margin-bottom: 15px;
+}
+
+.field label {
+  display: flex;
+  flex-direction: column;
+  color: #333;
+}
+
+.field strong {
+  margin-bottom: 5px;
 }
 
 .input {
   width: 100%;
   padding: 8px;
-  margin: 10px 0;
   border: 1px solid #ccc;
   border-radius: 5px;
   box-sizing: border-box;
@@ -65,4 +82,13 @@
 textarea.input {
   height: 100px;
   resize: vertical;
+}
+
+input[type="file"] {
+  padding: 0;
+}
+
+.error {
+  color: red;
+  margin: 10px 0;
 }

@@ -5,10 +5,10 @@ import "../styles/Profile.scss";
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [isEditing, setIsEditing] = useState(false); // Controla el modo edición
-  const [editedProfile, setEditedProfile] = useState({}); // Estado para los campos editados
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedProfile, setEditedProfile] = useState({});
+  const [file, setFile] = useState(null);
 
-  // Cargar el perfil al montar el componente
   useEffect(() => {
     getProfile();
   }, []);
@@ -21,7 +21,6 @@ export default function Profile() {
         data: { user },
         error: authError,
       } = await supabase.auth.getUser();
-
       if (authError || !user) {
         throw new Error("No se pudo obtener el usuario autenticado");
       }
@@ -41,7 +40,7 @@ export default function Profile() {
       if (data) {
         console.log("Perfil encontrado:", data);
         setProfile(data);
-        setEditedProfile(data); // Inicializamos el estado editable con los datos actuales
+        setEditedProfile(data);
       } else {
         setProfile(null);
         setErrorMessage("No se encontró un perfil para este usuario");
@@ -52,17 +51,62 @@ export default function Profile() {
     }
   }
 
-  // Manejar cambios en los inputs
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setEditedProfile((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Guardar los cambios
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const selectedFile = e.target.files[0];
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        setErrorMessage("La imagen no debe exceder 5MB");
+        return;
+      }
+      if (
+        !["image/jpeg", "image/png", "image/gif"].includes(selectedFile.type)
+      ) {
+        setErrorMessage("Solo se permiten imágenes JPG, PNG o GIF");
+        return;
+      }
+      setFile(selectedFile);
+    }
+  };
+
   const handleSave = async () => {
     setErrorMessage(null);
 
     try {
+      let photoUrl = editedProfile.photo;
+
+      if (file) {
+        const fileExt = file.name.split(".").pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${profile.email}/${fileName}`;
+        const bucketName = "SocialStorage";
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from(bucketName)
+          .upload(filePath, file);
+
+        if (uploadError) {
+          throw new Error("Error al subir la imagen: " + uploadError.message);
+        }
+
+        console.log("Imagen subida:", uploadData);
+
+        const { data: publicUrlData } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(filePath);
+
+        if (!publicUrlData || !publicUrlData.publicUrl) {
+          throw new Error("No se pudo generar una URL pública válida");
+        }
+
+        photoUrl = publicUrlData.publicUrl;
+        console.log("URL pública generada:", photoUrl);
+      }
+
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -71,16 +115,18 @@ export default function Profile() {
           description: editedProfile.description,
           instagram: editedProfile.instagram,
           phone: editedProfile.phone,
+          photo: photoUrl,
         })
-        .eq("email", profile.email); // Actualizamos basados en el email
+        .eq("email", profile.email);
 
       if (error) {
         throw new Error("Error al actualizar el perfil: " + error.message);
       }
 
-      setProfile(editedProfile); // Actualizamos el perfil mostrado
-      setIsEditing(false); // Salimos del modo edición
-      console.log("Perfil actualizado:", editedProfile);
+      setProfile({ ...editedProfile, photo: photoUrl });
+      setIsEditing(false);
+      setFile(null);
+      console.log("Perfil actualizado:", { ...editedProfile, photo: photoUrl });
     } catch (err) {
       console.error("Error updating profile:", err.message);
       setErrorMessage(err.message);
@@ -91,9 +137,9 @@ export default function Profile() {
     <div className="main">
       <h1>Perfil</h1>
       <div className="buttons">
-        <button className="button" onClick={getProfile}>
+        {/* <button className="button" onClick={getProfile}>
           Recargar Perfil
-        </button>
+        </button> */}
         {profile && (
           <button className="button" onClick={() => setIsEditing(!isEditing)}>
             {isEditing ? "Cancelar" : "Editar"}
@@ -111,52 +157,88 @@ export default function Profile() {
             className="img"
           />
           {isEditing ? (
-            <>
-              <input
-                type="text"
-                name="name"
-                value={editedProfile.name || ""}
-                onChange={handleInputChange}
-                placeholder="Nombre"
-                className="input"
-              />
-              <input
-                type="number"
-                name="age"
-                value={editedProfile.age || ""}
-                onChange={handleInputChange}
-                placeholder="Edad"
-                className="input"
-              />
-              <textarea
-                name="description"
-                value={editedProfile.description || ""}
-                onChange={handleInputChange}
-                placeholder="Descripción"
-                className="input"
-              />
-              <input
-                type="text"
-                name="instagram"
-                value={editedProfile.instagram || ""}
-                onChange={handleInputChange}
-                placeholder="Instagram"
-                className="input"
-              />
-              <input
-                type="text"
-                name="phone"
-                value={editedProfile.phone || ""}
-                onChange={handleInputChange}
-                placeholder="Teléfono"
-                className="input"
-              />
+            <div className="edit-form">
+              <div className="field">
+                <label>
+                  <strong>Nombre:</strong>
+                  <input
+                    type="text"
+                    name="name"
+                    value={editedProfile.name || ""}
+                    onChange={handleInputChange}
+                    placeholder="Nombre"
+                    className="input"
+                  />
+                </label>
+              </div>
+              <div className="field">
+                <label>
+                  <strong>Edad:</strong>
+                  <input
+                    type="number"
+                    name="age"
+                    value={editedProfile.age || ""}
+                    onChange={handleInputChange}
+                    placeholder="Edad"
+                    className="input"
+                  />
+                </label>
+              </div>
+              <div className="field">
+                <label>
+                  <strong>Descripción:</strong>
+                  <textarea
+                    name="description"
+                    value={editedProfile.description || ""}
+                    onChange={handleInputChange}
+                    placeholder="Descripción"
+                    className="input"
+                  />
+                </label>
+              </div>
+              <div className="field">
+                <label>
+                  <strong>Instagram:</strong>
+                  <input
+                    type="text"
+                    name="instagram"
+                    value={editedProfile.instagram || ""}
+                    onChange={handleInputChange}
+                    placeholder="Instagram"
+                    className="input"
+                  />
+                </label>
+              </div>
+              <div className="field">
+                <label>
+                  <strong>Teléfono:</strong>
+                  <input
+                    type="text"
+                    name="phone"
+                    value={editedProfile.phone || ""}
+                    onChange={handleInputChange}
+                    placeholder="Teléfono"
+                    className="input"
+                  />
+                </label>
+              </div>
+              <div className="field">
+                <label>
+                  <strong>Foto:</strong>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="input"
+                  />
+                </label>
+              </div>
               <div className="buttons">
                 <button className="button" onClick={handleSave}>
                   Guardar
                 </button>
               </div>
-            </>
+            </div>
           ) : (
             <>
               <p>
